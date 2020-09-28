@@ -22,18 +22,23 @@
     let group_template = document.querySelector('#group_template');
     let container = document.querySelector('#container');
     let result = document.querySelector('#result');
+
     async function get(url) {
         let response = await fetch(url);
+        let contentType = response.headers.get("Content-Type");
         if (!response.ok) {
-            return(`HTTP error! status: ${response.status}`);
+            return (`HTTP error! status: ${response.status}`);
         } else {
-            return await response.json();
+            if (contentType === 'application/json')
+                return await response.json();
+            else
+                return await response.text();
         }
     }
 
 
-    async function start(){
-        for(let name of await get('list') ){
+    async function start() {
+        for (let name of await get('list')) {
 
             let group_instance = group_template.content.cloneNode(true);
             let apiBtn = group_instance.querySelector('#apiBtn')
@@ -43,7 +48,7 @@
             container.appendChild(group_instance);
             apiBtn.onclick = async (event) => {
                 apiBtn.disabled = true
-                result.innerText = JSON.stringify(await get(name) );
+                result.innerText = await get(name);
                 apiBtn.disabled = false
             }
         }

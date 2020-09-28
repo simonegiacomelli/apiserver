@@ -27,11 +27,12 @@ class RequestHandler(SimpleHTTPRequestHandler):
         return params, rpath
 
     def send_json(self, obj):
-        self.send_string(json.dumps(obj, indent=2))
+        self.send_string(json.dumps(obj, indent=2), content_type='application/json')
 
-    def send_string(self, message, code=200):
+    def send_string(self, message, code=200, content_type='text/plain'):
         self.protocol_version = "HTTP/1.1"
         self.send_response(code)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(message)))
         self.send_header("Access-Control-Allow-Headers", "*")
         self.send_header("Access-Control-Allow-Methods", "*")

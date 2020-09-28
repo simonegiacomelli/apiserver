@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
+import getpass
 import os
-import sys
 import subprocess
 import time
-import getpass
 import urllib.request
 from functools import partial
 from http.server import HTTPServer
@@ -12,15 +11,24 @@ from dispatch import Dispatch
 from request_handler import RequestHandler
 
 
-def run(cmd, cwd=None):
-    print(f'running command [{cmd}]')
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
-    code, stdout, stderr = res.returncode, res.stdout.decode("utf-8"), res.stderr.decode("utf-8")
-    print(f'stdout=[[{stdout}]]')
-    print(f'stderr=[[{stderr}]]')
-    print('-' * 40)
-    print(f'status={code}')
-    return {'status': code, 'stdout': stdout, 'stderr': stderr}
+# the API_ method returns a string
+
+class run:
+    def __init__(self, cmd, cwd=None):
+        super().__init__()
+        self.cmd = cmd
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+        self.status, self.stdout, self.stderr = res.returncode, res.stdout.decode("utf-8"), res.stderr.decode("utf-8")
+
+    def __str__(self):
+        st = 'OK' if self.status == 0 else f'FAILED status={self.status}'
+        return \
+            f'status={st}\n' \
+            f'command={" ".join(self.cmd)}\n' \
+            f'stdout: ------------------------------\n' \
+            f'{self.stdout}\n' \
+            f'stderr: ------------------------------\n' \
+            f'{self.stderr}'
 
 
 class Example1:
@@ -35,63 +43,64 @@ class Example1:
     pgrep_base_args = ['-u', getpass.getuser(), '-l', '-f', executable]
 
     def API_execute(self):
-        res = self.API_pgrep_processes()
-        if res['status'] == 0:
-            res['message'] = 'already in execution'
+        pgrep_res = self.pgrep_processes()
+        if pgrep_res.status == 0:
+            res = 'something is already in execution. See here:\n\n' + str(pgrep_res)
         else:
-            res = self.API_execute_no_checks()
-            res['message'] = 'execute done'
-        print(res)
+            res = 'execute() done. See here:\n' + self.API_pkill_and_execute()
+
         return res
 
-    def API_execute_no_checks(self):
-        self.API_pkill_processes()
+    def API_pkill_and_execute(self):
+        self.pkill_processes()
 
         def new(port):
             cmd = ['nohup', './' + self.executable, f'{port}']
-            print(f'running command {" ".join(cmd)}')
-            res = subprocess.Popen(cmd, cwd=".",
+            pid = subprocess.Popen(cmd, cwd=".",
                                    stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, preexec_fn=os.setpgrp)
-            time.sleep(0.1)
-            return res
+                                   stderr=subprocess.PIPE,
+                                   preexec_fn=os.setpgrp).pid
 
-        pid_list = [new(port).pid for port in self.ports]
-        result = {'pid_list': pid_list}
-        print(result)
+            time.sleep(0.1)
+            return f'command={" ".join(cmd)} -> pid {pid}'
+
+        lines = [new(port) for port in self.ports]
+        result = '\n'.join(lines)
         return result
 
     def API_pkill_processes(self):
-        return run(['pkill'] + self.pgrep_base_args)
-
-    def API_git_pull(self):
-        return run(['git', 'pull'], cwd='..')
+        return str(self.pkill_processes())
 
     def API_pgrep_processes(self):
-        return run(['pgrep'] + self.pgrep_base_args)
+        return str(self.pgrep_processes())
 
-    def API_aspetta(self):
-        time.sleep(3)
-        return 'waited a bit'
+    def API_git_pull(self):
+        return str(run(['git', 'pull'], cwd='..'))
+
+    def pkill_processes(self) -> run:
+        return run(['pkill'] + self.pgrep_base_args)
+
+    def pgrep_processes(self) -> run:
+        return run(['pgrep'] + self.pgrep_base_args)
 
     def API_health(self):
         ok = []
         failed = []
         for port in self.ports:
+            port = str(port)
             try:
                 decode = urllib.request.urlopen(f'http://localhost:{port}', timeout=1).read().decode('utf-8')
-                ok.append((port, decode))
+                ok.append(port + ' ' + decode)
             except Exception as ex:
-                failed.append((port, str(ex)))
+                failed.append(port + ' ' + str(ex))
 
-        res = {}
+        res = ''
+        ok_lines = '\n\n'.join(ok)
+        failed_lines = '\n\n'.join(failed)
         if len(failed) > 0:
-            res['result'] = 'FAILED'
-            res['errors'] = failed
-        else:
-            res['result'] = 'everything ok'
-        res['ok'] = ok
-        print(res)
+            res += f'status=FAILED\n{failed_lines}\n\n'
+
+        res += f'status=OK\n\n{ok_lines}'
         return res
 
 
@@ -100,7 +109,7 @@ def main():
     port = 8090
     print('Starting server web v0.1 on port %d...' % port)
 
-    Example1().API_execute()
+    print(Example1().API_execute())
 
     api_dispatch = Dispatch().register(Example1, 'API_')
 
@@ -112,12 +121,19 @@ def main():
             request.send_json(list(api_dispatch.registered.keys()))
         elif api_name == '':
             request.serve_file(os.path.dirname(__file__), "index.html")
+        elif api_name == 'favicon.ico':
+            request.send_response(404, '')
         else:
             instance = Example1()
             instance.request = request
             result = api_dispatch.dispatch(instance, api_name, params)
-            if result is not None:
+            if isinstance(result, str):
+                print(result)
+                request.send_string(result)
+            elif isinstance(result, (list, set, dict, tuple)):
                 request.send_json(result)
+            else:
+                request.send_json(result.__dict__)
 
         return True
 
