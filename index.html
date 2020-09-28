@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Title</title>
+</head>
+<body>
+<h4>melindasvc</h4>
+
+<div id="container"></div>
+<br>
+<div id="result"></div>
+<template id="group_template">
+
+    <button id="apiBtn" class="group_btn"></button>
+    <br>
+    <br>
+</template>
+
+<script>
+    let group_template = document.querySelector('#group_template');
+    let container = document.querySelector('#container');
+    let result = document.querySelector('#result');
+    async function get(url) {
+        let response = await fetch(url);
+        if (!response.ok) {
+            return(`HTTP error! status: ${response.status}`);
+        } else {
+            return await response.json();
+        }
+    }
+
+
+    async function start(){
+        for(let name of await get('list') ){
+
+            let group_instance = group_template.content.cloneNode(true);
+            let apiBtn = group_instance.querySelector('#apiBtn')
+            apiBtn.id = `group-${name}`
+            apiBtn.innerHTML = name
+            apiBtn.href = '#'
+            container.appendChild(group_instance);
+            apiBtn.onclick = async (event) => {
+                apiBtn.disabled = true
+                result.innerText = JSON.stringify(await get(name) );
+                apiBtn.disabled = false
+            }
+        }
+    }
+
+
+    start();
+</script>
+</body>
+</html>
