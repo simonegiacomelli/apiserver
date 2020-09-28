@@ -45,7 +45,7 @@ class Example1:
         return res
 
     def API_execute_no_checks(self):
-        self.API_pkill_melinda()
+        self.API_pkill_processes()
 
         def new(port):
             cmd = ['nohup', './' + self.executable, f'{port}']
@@ -61,7 +61,7 @@ class Example1:
         print(result)
         return result
 
-    def API_pkill_melinda(self):
+    def API_pkill_processes(self):
         return run(['pkill'] + self.pgrep_base_args)
 
     def API_git_pull(self):
