@@ -33,7 +33,7 @@ class run:
 
 class Example1:
     """
-    manage an array of python
+    manage an array of python web servers
     """
     ports = list(range(5001, 5004))
     executable = 'example1helper.py'
