@@ -1,10 +1,13 @@
+import base64
 import json
 from http.server import SimpleHTTPRequestHandler
+from pathlib import Path
 from typing import Callable
 from urllib.parse import urlparse, parse_qs
 
 
 class RequestHandler(SimpleHTTPRequestHandler):
+    auth_file = Path('.auth.txt')  # username:password see RFC 7617
     query_index = 4
     path_index = 2
 
@@ -15,6 +18,9 @@ class RequestHandler(SimpleHTTPRequestHandler):
         super(RequestHandler, self).__init__(*args, **kwargs)
 
     def do_GET(self):
+        if not self.authorized():
+            self.send_string('not authorized', code=401)
+            return
         if not self.handler(self):
             super(RequestHandler, self).do_GET()
 
@@ -25,6 +31,15 @@ class RequestHandler(SimpleHTTPRequestHandler):
         di = parse_qs(query_str)
         params = {k: v[0] for k, v in di.items()}
         return params, rpath
+
+    def authorized(self):
+        if not self.auth_file.exists():
+            return True
+        auth_raw = self.headers.get('Authorization', '').split(' ')
+        if len(auth_raw) != 2 or auth_raw[0] != 'Basic':
+            return False
+        auth_decoded = base64.b64decode(auth_raw[1]).decode('utf-8')
+        return auth_decoded == self.auth_file.read_text()
 
     def send_json(self, obj):
         self.send_string(json.dumps(obj, indent=2), content_type='application/json')
@@ -37,6 +52,7 @@ class RequestHandler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "*")
         self.send_header("Access-Control-Allow-Methods", "*")
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("WWW-Authenticate", "Basic")
         self.end_headers()
         self.wfile.write(bytes(message, "utf8"))
 
