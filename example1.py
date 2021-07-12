@@ -105,7 +105,9 @@ class Example1:
 
 
 def main():
-    os.chdir(os.path.dirname(__file__))
+    script_dir = os.path.dirname(__file__)
+    if script_dir != '':
+        os.chdir(script_dir)
     port = 8090
     print('Starting server web v0.1 on port %d...' % port)
 
@@ -120,7 +122,7 @@ def main():
         if api_name == 'list':
             request.send_json(list(api_dispatch.registered.keys()))
         elif api_name == '':
-            request.serve_file(os.path.dirname(__file__), "index.html")
+            request.serve_file(script_dir, "index.html")
         elif api_name == 'favicon.ico':
             request.send_response(404, '')
         else:
